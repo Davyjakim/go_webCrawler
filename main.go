@@ -3,44 +3,48 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/url"
 	"os"
-
-	"sync"
-
+	"strconv"
 )
 
 
 
 func main(){
 	cliArg:= os.Args[1:]
+	maxConcurency:=20
+	maxPage:=100
 	if len(cliArg)<1{
 		log.Fatal("no website provided")
 	}
-	if len(cliArg)>1{
+	if len(cliArg)>3{
 		log.Fatal("too many arguments provided")
 	}
-	baseUrl,err:=url.Parse(cliArg[0])
+	if len(cliArg)==2{
+		num, err := strconv.Atoi(cliArg[1])
+		if err!=nil{
+			log.Fatal(err)
+		}
+		maxConcurency =num
+	}
+	if len(cliArg)==3{
+		num, err := strconv.Atoi(cliArg[2])
+		if err!=nil{
+			log.Fatal(err)
+		}
+		maxPage =num
+	}
+
+	rawBaseURL := cliArg[0]
+	cfg,err:= configure(rawBaseURL,maxPage,maxConcurency)
 	if err!=nil{
 		log.Fatal(err)
 	}
-	
-	cfg:= config{
-		pages: make(map[string]PageData),
-		baseURL: baseUrl,
-		mu: &sync.Mutex{},
-		concurrencyControl: make(chan struct{},25),
-		wg: &sync.WaitGroup{},
-		maxPages: 3,
-	}
-
+	fmt.Printf("starting crawl of: %s...\n", rawBaseURL)
 	cfg.wg.Add(1)
-	go cfg.crawlPage(baseUrl.String())
+	go cfg.crawlPage(rawBaseURL)
 	cfg.wg.Wait()
 
 	
-	for normalizedURL, data := range cfg.pages {
-		fmt.Printf("%v - %v\n", data.Heading, normalizedURL)
-	}
+	writeJSONReport(cfg.pages, "report.json")
 
 }

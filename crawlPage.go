@@ -14,6 +14,21 @@ type config struct {
 	wg                 *sync.WaitGroup
 	maxPages 			int
 }
+func configure(rawBaseURL string,maxPage,maxConcurrency int) (*config, error) {
+	baseURL, err := url.Parse(rawBaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse base URL: %v", err)
+	}
+
+	return &config{
+		pages:              make(map[string]PageData),
+		baseURL:            baseURL,
+		mu:                 &sync.Mutex{},
+		concurrencyControl: make(chan struct{}, maxConcurrency),
+		wg:                 &sync.WaitGroup{},
+		maxPages: maxPage,
+	}, nil
+}
 
 func (cfg *config)crawlPage(rawCurrentURL string){
 	cfg.concurrencyControl <-struct{}{}
@@ -21,7 +36,10 @@ func (cfg *config)crawlPage(rawCurrentURL string){
 		cfg.wg.Done()}() 
 	currentURL,err:=url.Parse(rawCurrentURL)
 	if err!=nil{
-		fmt.Println(err)
+			fmt.Println(currentURL,err)
+			return
+	}
+	if cfg.pagesLen()>=cfg.maxPages{
 		return
 	}
 	if cfg.baseURL.Hostname()!=currentURL.Hostname(){
@@ -36,7 +54,7 @@ func (cfg *config)crawlPage(rawCurrentURL string){
 	if !isFirst{
 		return
 	}
-
+	fmt.Printf("crawling %s\n", rawCurrentURL)
 
 	html,err:=getHTML(currentURL.String())
 	if err!=nil{
@@ -72,4 +90,11 @@ func (cfg *config) addPageVisit(normalizedURL string) (isFirst bool){
 	// Mark it immediately so no other goroutine attempts to crawl it
 	cfg.pages[normalizedURL] = PageData{} 
 	return true
+}
+
+func (cfg *config) pagesLen()int{
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+
+	return len(cfg.pages)
 }

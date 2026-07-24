@@ -70,21 +70,21 @@ func getImagesFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
 	}
 	var images []string
 	
-	doc.Find("img").EachWithBreak(func(_ int, s *goquery.Selection) bool{
+	doc.Find("img").Each(func(_ int, s *goquery.Selection){
 		src, ok := s.Attr("src")
 		if !ok || strings.TrimSpace(src) == "" {
-			return false
+			return
 		}
 		// relative
 		u, err := url.Parse(src)
 		if err != nil {
 			fmt.Printf("couldn't parse src %q: %v\n", src, err)
-			return false
+			return 
 		}
 
 		absolute := baseURL.ResolveReference(u)
 		images = append(images, absolute.String())
-		return true
+		
 
     })
 	return images,nil
